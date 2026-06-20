@@ -1,0 +1,26 @@
+{
+  "sistemas_medida": {
+    "nombre": "Sistemas Web a Medida",
+    "descripcion": "Plataformas robustas y escalables. Sistemas logísticos, seguimiento en tiempo real y herramientas operativas complejas."
+  },
+  "pwa": {
+    "nombre": "Progressive Web Apps (PWA)",
+    "descripcion": "Apps instalables, rápidas y eficientes, ideales para personal en movimiento o distribución."
+  },
+  "ecommerce": {
+    "nombre": "E-commerce y Catálogos",
+    "descripcion": "Tiendas online autoadministrables para vender sin intermediarios."
+  },
+  "gestion": {
+    "nombre": "Paneles de Gestión y Reservas",
+    "descripcion": "Administración centralizada de datos, propiedades o turnos."
+  },
+  "spa": {
+    "nombre": "Aplicaciones Web Modernas (SPA)",
+    "descripcion": "Interfaces dinámicas, ultrarrápidas y fluidas para máxima retención de clientes."
+  },
+  "api": {
+    "nombre": "Integración de APIs",
+    "descripcion": "Conectamos tus sistemas con facturación, mapas y bases de datos externas para eliminar tareas manuales."
+  }
+}

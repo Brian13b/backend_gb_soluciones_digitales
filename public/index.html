@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>Chat de Prueba GB Soluciones</h2>
+    <input type="text" id="userInput" placeholder="Escribe tu consulta...">
+    <button onclick="enviarMensaje()">Enviar</button>
+    <p id="response"></p>
+
+    <script>
+        async function enviarMensaje() {
+            const text = document.getElementById('userInput').value;
+            const res = await fetch('/webhook', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: text})
+            });
+            const data = await res.json();
+            document.getElementById('response').innerText = data.response;
+        }
+    </script>
+</body>
+</html>

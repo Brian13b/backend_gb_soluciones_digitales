@@ -1,0 +1,15 @@
+# Entornos
+.venv/
+__pycache__/
+*.pyc
+
+# Configuración
+.env
+.env.local
+
+# Logs y bases de datos locales
+*.log
+*.sqlite3
+
+# Carpetas de sistema
+.DS_Store
