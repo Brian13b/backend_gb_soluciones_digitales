@@ -62,21 +62,21 @@ El proyecto se encuentra estructurado en fases incrementales para asegurar la es
 * Creación del `ServicioManager` utilizando algoritmos de coincidencia de texto locales (`difflib`) para pruebas seguras con cero costo de API.
 * Creación de una interfaz gráfica mínima (`public/index.html`) para pruebas de caja negra del backend.
 
-### 🟨 Fase 2: Despliegue en la Nube y CI/CD (Actual)
+### 🟨 Fase 2: Despliegue en la Nube y CI/CD (Completado)
 * Configuración del repositorio remoto en GitHub y resolución de conflictos de ramas iniciales.
 * Despliegue automatizado en Railway Pro conectando el pipeline de GitHub Actions.
 * Exposición del puerto dinámico mediante la inyección del comando `Procfile` y la variable `$PORT`.
 
-### 🟦 Fase 3: Conexión de API Externa e Inteligencia Generativa (Próximo paso)
+### 🟦 Fase 3: Conexión de API Externa e Inteligencia Generativa (Actual)
 * Habilitación de la cuenta de facturación en OpenAI e integración del SDK oficial con el modelo `gpt-4o-mini`.
 * Superación de los factores de validación de Meta for Developers para adquirir el `PHONE_NUMBER_ID` de desarrollo.
 * Refactorización de `src/main.py` para parsear la estructura anidada de los objetos JSON reales enviados por WhatsApp Cloud API.
 
-### 🚀 Fase 4: Persistencia de Datos y Gestión de Contexto (Mediano Plazo)
+### 🚀 Fase 4: Persistencia de Datos y Gestión de Contexto (Proximo)
 * Integración de una base de datos relacional (PostgreSQL en Railway) mediante un ORM como SQLAlchemy.
 * Implementación de un sistema de gestión de estados conversacionales (*Conversation State Management*) para que la IA recuerde el contexto histórico de los mensajes previos de cada cliente (basado en el número de teléfono).
 
-### 🎨 Fase 5: Panel de Control Administrativo (Dashboard Pro Max)
+### 🎨 Fase 5: Panel de Control Administrativo (Dashboard)
 * Desarrollo de un Frontend robusto y exclusivo para la administración de **GB Soluciones Digitales**.
 * **Identidad Visual:** Diseño de la interfaz enfocado en un enfoque corporativo y limpio utilizando una paleta de colores sofisticada en tonos naranja y arena.
 * **Funcionalidades Clave:**

@@ -1,4 +1,5 @@
 import os
+from fastapi.responses import FileResponse
 import httpx
 from fastapi import FastAPI, Request, HTTPException
 from src.bot_logic import BotLogic
@@ -9,6 +10,10 @@ bot = BotLogic()
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+
+@app.get("/")
+async def read_index():
+    return FileResponse("public/index.html")
 
 @app.get("/webhook")
 async def verify_webhook(request: Request):
@@ -26,6 +31,12 @@ async def verify_webhook(request: Request):
 async def handle_message(request: Request):
     """Recepción y procesamiento de mensajes entrantes"""
     data = await request.json()
+    
+    if "text" in data:
+        mensaje_usuario = data["text"]
+        print(f"Mensaje desde la Web: {mensaje_usuario}")
+        respuesta_ia = bot.procesar(mensaje_usuario)
+        return {"status": "ok", "response": respuesta_ia}
     
     try:
         entry = data.get("entry", [])[0]
@@ -45,7 +56,7 @@ async def handle_message(request: Request):
                 
                 respuesta_ia = bot.procesar(mensaje_usuario)
                 
-                await enviar_mensaje_whatsapp(numero_cliente, respuesta_ia)
+                # await enviar_mensaje_whatsapp(numero_cliente, respuesta_ia)
                 
     except Exception as e:
         print(f"Error parseando el webhook de Meta: {e}")

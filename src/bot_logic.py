@@ -1,22 +1,38 @@
 import os
+from dotenv import load_dotenv
 from openai import OpenAI
 from src.services.servicio_manager import ServicioManager
+
+load_dotenv()
 
 class BotLogic:
     def __init__(self):
         self.manager = ServicioManager()
-        self.client = OpenAI()
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key and api_key.startswith("sk-"):
+            self.client = OpenAI(api_key=api_key)
+            print("✅ Conexión con OpenAI establecida.")
+        else:
+            self.client = None
 
     def procesar(self, mensaje):
-        # Obtenemos el catalogo de servicios relevante para la consulta
-        contexto_servicios = self.manager.obtener_respuesta_inteligente(mensaje)
-        
-        # Armamos el Prompt (La personalidad del bot)
-        system_prompt = f"""Eres el asistente virtual de GB Soluciones Digitales.
-        Tu objetivo es responder consultas técnicas y comerciales sobre nuestros servicios de forma profesional y clara.
-        Utiliza estrictamente la siguiente información para responder:
-        {contexto_servicios}
-        Si te preguntan algo que no está en la información, ofrece derivar la consulta a un desarrollador de nuestro equipo."""
+        if not self.client:
+            return "Modo offline activado."
+
+        catalogo = self.manager.obtener_catalogo_completo()
+
+        system_prompt = f"""Eres el asistente virtual experto de GB Soluciones Digitales.
+        Tu trabajo es atender a los clientes de forma amable, profesional y concisa.
+
+        NUESTRO CATÁLOGO DE SERVICIOS:
+        {catalogo}
+
+        REGLAS DE RESPUESTA:
+        1. Consulta de Servicios: Si preguntan por nuestros servicios, usa la información del catálogo para asesorarlos.
+        2. Fuera de alcance: Si preguntan por algo que NO hacemos (ej. "venden tornillos", ropa, hardware), responde amablemente que somos una agencia de desarrollo de software y no ofrecemos esos productos.
+        3. Traspaso Humano: Si el cliente pide hablar con un humano, un desarrollador o una persona real, responde EXACTAMENTE esto: "Ya notifiqué a uno de nuestros desarrolladores. En cuanto se desocupe, te escribirá por este medio para asesorarte personalmente."
+        4. E-commerce: Si consultan por tiendas virtuales, aclara que la modalidad de trabajo para estos proyectos no incluye pasarelas de pago automatizadas, sino que se integran con WhatsApp para que el comercio cierre la venta en trato directo con su cliente.
+        """
 
         try:
             response = self.client.chat.completions.create(
@@ -31,5 +47,4 @@ class BotLogic:
             return response.choices[0].message.content
         except Exception as e:
             print(f"Error de conexión con OpenAI: {e}")
-            # Fallback de seguridad si falla la API
-            return contexto_servicios
+            return "Hubo un error al procesar tu consulta."

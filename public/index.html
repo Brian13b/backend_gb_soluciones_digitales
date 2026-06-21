@@ -1,21 +1,192 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GB Soluciones - Test IA</title>
+    <style>
+        :root {
+            --naranja-corporativo: #E67E22;
+            --naranja-oscuro: #D35400;
+            --arena-fondo: #F4E8D1;
+            --texto-oscuro: #2C3E50;
+            --blanco: #FFFFFF;
+            --gris-claro: #EAEAEA;
+        }
+        
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body {
+            background-color: var(--arena-fondo);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: var(--texto-oscuro);
+        }
+        
+        .chat-container {
+            background-color: var(--blanco);
+            width: 100%;
+            max-width: 420px;
+            height: 85vh;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            background-color: var(--naranja-corporativo);
+            color: var(--blanco);
+            padding: 18px;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: #FAFAFA;
+        }
+        
+        .message {
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 85%;
+            line-height: 1.4;
+            font-size: 0.95rem;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .user-message {
+            background-color: var(--naranja-corporativo);
+            color: var(--blanco);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .bot-message {
+            background-color: var(--gris-claro);
+            color: var(--texto-oscuro);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .chat-input-area {
+            display: flex;
+            padding: 15px;
+            background-color: var(--blanco);
+            border-top: 1px solid #EEE;
+        }
+        
+        .chat-input-area input {
+            flex-grow: 1;
+            padding: 12px 18px;
+            border: 1px solid #DDD;
+            border-radius: 24px;
+            outline: none;
+            font-size: 0.95rem;
+            transition: border 0.3s;
+        }
+        
+        .chat-input-area input:focus { border-color: var(--naranja-corporativo); }
+        
+        .chat-input-area button {
+            background-color: var(--naranja-corporativo);
+            color: var(--blanco);
+            border: none;
+            padding: 0 20px;
+            margin-left: 10px;
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        .chat-input-area button:hover { background-color: var(--naranja-oscuro); }
+        
+        .typing-indicator { font-style: italic; color: #888; font-size: 0.85rem; display: none; margin-left: 10px; }
+    </style>
+</head>
 <body>
-    <h2>Chat de Prueba GB Soluciones</h2>
-    <input type="text" id="userInput" placeholder="Escribe tu consulta...">
-    <button onclick="enviarMensaje()">Enviar</button>
-    <p id="response"></p>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            GiBi - Asistente GB Soluciones
+        </div>
+        
+        <div class="chat-messages" id="chatBox">
+            <div class="message bot-message">¡Hola! Soy GiBi el asistente virtual de GB Soluciones Digitales. ¿En qué puedo ayudarte hoy?</div>
+        </div>
+        
+        <div class="typing-indicator" id="typing">El bot está escribiendo...</div>
+        
+        <div class="chat-input-area">
+            <input type="text" id="userInput" placeholder="Escribe tu consulta aquí..." onkeypress="handleEnter(event)">
+            <button onclick="enviarMensaje()">Enviar</button>
+        </div>
+    </div>
 
     <script>
+        const chatBox = document.getElementById('chatBox');
+        const userInput = document.getElementById('userInput');
+        const typingIndicator = document.getElementById('typing');
+
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
+            msgDiv.innerText = text;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
         async function enviarMensaje() {
-            const text = document.getElementById('userInput').value;
-            const res = await fetch('/webhook', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({text: text})
-            });
-            const data = await res.json();
-            document.getElementById('response').innerText = data.response;
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // Mostrar mensaje del usuario
+            addMessage(text, 'user');
+            userInput.value = '';
+            
+            // Mostrar estado "escribiendo"
+            typingIndicator.style.display = 'block';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const res = await fetch('/webhook', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text: text})
+                });
+                const data = await res.json();
+                
+                // Ocultar estado "escribiendo" y mostrar respuesta de la IA
+                typingIndicator.style.display = 'none';
+                addMessage(data.response, 'bot');
+                
+            } catch (error) {
+                typingIndicator.style.display = 'none';
+                addMessage('⚠️ Error de conexión con el servidor local.', 'bot');
+            }
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                enviarMensaje();
+            }
         }
     </script>
 </body>
