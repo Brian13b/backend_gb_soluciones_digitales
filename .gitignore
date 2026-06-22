@@ -13,3 +13,13 @@ __pycache__/
 
 # Carpetas de sistema
 .DS_Store
+
+# Archivos internos (no en GitHub)
+.claude/
+.idea/
+.vscode/
+
+# IDE y editores
+*.swp
+*.swo
+*~
