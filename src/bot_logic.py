@@ -26,7 +26,7 @@ class BotLogic:
             print(f"❌ Error cargando System Prompt: {e}")
             return "Eres el asistente de GB Soluciones Digitales."
 
-    def procesar(self, mensaje, history=[]):
+    def procesar(self, mensaje, history=[], channel="web"):
         if not self.client:
             return "Modo offline activado."
 
@@ -34,6 +34,7 @@ class BotLogic:
         system_prompt_base = self._cargar_system_prompt()
         
         system_prompt = system_prompt_base.replace("{catalogo}", catalogo)
+        system_prompt += f"\n\nCONTEXTO DE CANAL: El usuario se comunica a través de {channel}."
 
         mensajes_api = [{"role": "system", "content": system_prompt}]
         mensajes_api.extend(history)
