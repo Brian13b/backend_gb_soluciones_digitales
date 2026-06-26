@@ -10,7 +10,7 @@ app = FastAPI(title="GB Soluciones Digitales - API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://gbsolucionesdigitales.com.ar"],
+    allow_origins=["https://www.gbsolucionesdigitales.com.ar", "https://gbsolucionesdigitales.com.ar"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
