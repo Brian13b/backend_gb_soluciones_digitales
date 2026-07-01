@@ -4,19 +4,14 @@ import jwt
 from admin.core.config import settings
 
 def hash_password(password: str) -> str:
-    # 1. Truncamos a 72 bytes (límite de bcrypt)
-    # 2. Convertimos a bytes (utf-8)
-    # 3. Generamos salt y hasheamos
     pwd_bytes = password[:72].encode('utf-8')
     salt = bcrypt.gensalt()
     pwd_hash = bcrypt.hashpw(pwd_bytes, salt)
     return pwd_hash.decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    # Convertimos ambos a bytes para comparar
     pwd_bytes = plain_password[:72].encode('utf-8')
     hash_bytes = hashed_password.encode('utf-8')
-    # Verificamos
     return bcrypt.checkpw(pwd_bytes, hash_bytes)
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
