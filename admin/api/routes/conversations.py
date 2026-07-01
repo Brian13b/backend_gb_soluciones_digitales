@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from shared.models import Conversation, Message
 from shared.schemas import ConversationListSchema, ConversationDetailSchema, MessageSchema
@@ -26,14 +26,14 @@ def list_conversations(
     if channel:
         query = query.filter(Conversation.channel == channel)
     
-    conversations = query.order_by(desc(Conversation.updated_at)).offset(skip).limit(limit).all()
-    
+    # Eager load messages to avoid N+1 query problem
+    conversations = query.options(joinedload(Conversation.messages)).order_by(desc(Conversation.updated_at)).offset(skip).limit(limit).all()
+
     result = []
     for conv in conversations:
-        last_message = db.query(Message).filter(
-            Message.conversation_id == conv.id
-        ).order_by(desc(Message.created_at)).first()
-        
+        # Extract last message from already-loaded messages (no DB query needed)
+        last_message = max(conv.messages, key=lambda m: m.created_at) if conv.messages else None
+
         result.append(ConversationListSchema(
             id=conv.id,
             session_id=conv.session_id,
@@ -47,7 +47,7 @@ def list_conversations(
             created_at=conv.created_at,
             updated_at=conv.updated_at
         ))
-    
+
     return result
  
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailSchema)
