@@ -1,4 +1,3 @@
-import os
 import re
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -8,6 +7,8 @@ from bot.database import get_db
 from shared.schemas import ChatWebRequest, ChatResponse
 from bot import crud
 from bot.bot_logic import BotLogic
+from bot.core.config import settings
+from bot.core.security import verify_webhook_signature
 
 router = APIRouter()
 bot = BotLogic()
@@ -52,27 +53,41 @@ async def chat_web(request_data: ChatWebRequest, db: Session = Depends(get_db)):
     )
 
 # ==========================================
-# RUTAS PARA WHATSAPP (Futuro)
+# RUTAS PARA WHATSAPP
 # ==========================================
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
-PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
 
 @router.get("/webhook")
 async def verify_webhook(request: Request):
-    """Ruta de verificación para Meta"""
+    """Ruta de verificación para Meta (GET request during webhook setup)"""
     mode = request.query_params.get("hub.mode")
     token = request.query_params.get("hub.verify_token")
     challenge = request.query_params.get("hub.challenge")
-    
-    if mode == "subscribe" and token == VERIFY_TOKEN:
-        print("Webhook verificado exitosamente por Meta!")
+
+    if mode == "subscribe" and token == settings.WHATSAPP_VERIFY_TOKEN:
+        print("✅ Webhook verificado exitosamente por Meta!")
         return int(challenge)
-    raise HTTPException(status_code=403, detail="Error de verificación")
+    raise HTTPException(status_code=403, detail="❌ Error de verificación del webhook")
 
 @router.post("/webhook")
 async def handle_message(request: Request, db: Session = Depends(get_db)):
-    """Recepción y procesamiento de mensajes de WhatsApp"""
+    """
+    Recepción y procesamiento de mensajes de WhatsApp.
+    Valida firma HMAC SHA-256 para prevenir webhooks falsificados.
+    """
+    # Get the raw body for signature verification
+    body = await request.body()
+
+    # Get the signature from the header
+    x_hub_signature_256 = request.headers.get("X-Hub-Signature-256")
+
+    # Verify webhook signature (prevents spoofed webhooks from Meta)
+    if not verify_webhook_signature(body, x_hub_signature_256):
+        raise HTTPException(
+            status_code=401,
+            detail="❌ Firma de webhook inválida. Acceso denegado."
+        )
+
+    # Parse JSON after signature validation
     data = await request.json()
     
     try:
@@ -113,9 +128,9 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
 
 async def enviar_mensaje_whatsapp(numero, texto):
     """Ejecuta un POST a la Graph API de Meta para enviar la respuesta"""
-    url = f"https://graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages"
+    url = f"https://graph.facebook.com/v19.0/{settings.PHONE_NUMBER_ID}/messages"
     headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+        "Authorization": f"Bearer {settings.WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
     }
     payload = {
