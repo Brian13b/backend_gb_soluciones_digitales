@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from admin.api.routes import auth, conversations, contact_attempts, stats
 from admin.database import engine
-from admin.models import Base
+from shared.models import Base
 from admin.core.config import settings
  
 # Crear tablas

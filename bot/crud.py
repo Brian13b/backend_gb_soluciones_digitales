@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 import uuid
 
-from bot.models import Conversation, Message
+from shared.models import Conversation, Message
 
 def get_or_create_conversation(db: Session, session_id: str, channel: str = "web"):
     """

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from admin.models import Conversation
+from shared.models import Conversation
 from admin.api.deps import get_db, get_current_user
  
 router = APIRouter()
