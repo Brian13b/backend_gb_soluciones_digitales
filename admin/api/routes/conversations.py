@@ -22,7 +22,7 @@ def list_conversations(limit: int = 50, estado: str = None, channel: str = None,
     return query.order_by(Conversation.updated_at.desc()).limit(limit).all()
  
 @router.get("/{conversation_id}", response_model=ConversationDetailSchema)
-def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
+def get_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
     conversation = db.query(Conversation).options(
         joinedload(Conversation.contacts),
         joinedload(Conversation.messages)
@@ -34,7 +34,7 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
     return conversation
  
 @router.patch("/{conversation_id}/estado")
-def update_conversation_estado(conversation_id: str, estado: str, db: Session = Depends(get_db)):
+def update_conversation_estado(conversation_id: UUID, estado: str, db: Session = Depends(get_db)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     
     if not conversation:
@@ -48,7 +48,7 @@ def update_conversation_estado(conversation_id: str, estado: str, db: Session = 
 
 
 @router.delete("/{conversation_id}")
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
+def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     
     if not conversation:
