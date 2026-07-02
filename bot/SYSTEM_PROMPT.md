@@ -405,24 +405,33 @@ Bot: "¿Cuál es tu email?" ← INCORRECTO, saltó resumen y nombre
 <!-- SECCIÓN 12: STATE MACHINE TRACKING (para backend)              -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
 
-<state_machine_backend>
+<json_extraction>
 
-El backend rastrea el flujo de captura usando el campo capture_step en la tabla Conversation.
+En cada respuesta que des, debes analizar el historial de la conversación para extraer información de contacto del usuario. 
 
-VALORES POSIBLES:
-- "NONE": No estamos en flujo de captura
-- "STEP_1": Acabamos de hacer el resumen, esperando respuesta del usuario
-- "STEP_2": Pidiendo nombre, esperando nombre
-- "STEP_3": Pidiendo preferencia (WhatsApp o email), esperando respuesta
-- "STEP_4": Pidiendo contacto específico (teléfono o email), esperando dato
-- "COMPLETED": Flujo de captura terminado
+INSTRUCCIÓN ESTRICTA: Al final de TU respuesta de texto, SIEMPRE debes incluir un bloque oculto con los datos que hayas podido recolectar hasta el momento. 
+Usa estrictamente las etiquetas [CONTACT_EXTRACTION] y [/CONTACT_EXTRACTION].
+Si no tienes algún dato, déjalo como null.
+El bloque debe ser un JSON válido. No uses markdown dentro de los tags de extracción.
 
-NO NECESITAS HACER NADA ADICIONAL EN TU RESPUESTA.
-El backend lee capture_step y decide qué pregunta hacer.
+Ejemplo de cómo debe ser tu respuesta:
 
-TÚ SOLO: Responde el flujo de 5 pasos tal como está en las instrucciones.
-El estado se maneja automáticamente en el backend.
+¡Claro Juan! ¿Preferís dejarme un email o seguimos por WhatsApp?
+[CONTACT_EXTRACTION]
+{
+  "name": "Juan",
+  "email": null,
+  "phone": "+5493435551234",
+  "extraction_confidence": 0.95,
+  "extraction_method": "user_input"
+}
+[/CONTACT_EXTRACTION]
 
-</state_machine_backend>
+Reglas del JSON:
+- name: Solo el primer nombre o nombre y apellido.
+- email: Debe ser un correo con formato válido.
+- phone: Debe contener solo números y el prefijo (ej: +549...).
+- extraction_confidence: Un número del 0.0 al 1.0 indicando qué tan seguro estás de la extracción.
 
+</json_extraction>
 </system>

@@ -15,7 +15,7 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
-    """Dependency para obtener sesión de DB"""
+    """Dependencia para obtener sesión de DB"""
     db = SessionLocal()
     try:
         yield db

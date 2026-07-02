@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from dotenv import load_dotenv
 from openai import OpenAI
 from bot.services.servicio_manager import ServicioManager
@@ -16,7 +18,6 @@ class BotLogic:
             self.client = None
 
     def _cargar_system_prompt(self):
-        """Lee el System Prompt directamente desde el archivo Markdown."""
         ruta_actual = os.path.dirname(os.path.abspath(__file__))
         ruta_prompt = os.path.join(ruta_actual, "SYSTEM_PROMPT.md")
         try:
@@ -25,10 +26,31 @@ class BotLogic:
         except Exception as e:
             print(f"❌ Error cargando System Prompt: {e}")
             return "Eres el asistente de GB Soluciones Digitales."
+        
+    def _parse_extraction_json(self, text: str) -> dict:
+        pattern = r'\[CONTACT_EXTRACTION\](.*?)\[\/CONTACT_EXTRACTION\]'
+        match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+        
+        if match:
+            json_str = match.group(1).strip()
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError as e:
+                print(f"⚠️ Error parseando el JSON de extracción: {e}")
+                return {}
+        return {}
+    
+    def _strip_extraction_markers(self, text: str) -> str:
+        pattern = r'\[CONTACT_EXTRACTION\].*?\[\/CONTACT_EXTRACTION\]'
+        clean_text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE).strip()
+        return clean_text
 
     def procesar(self, mensaje, history=[], channel="web"):
         if not self.client:
-            return "Modo offline activado."
+            return {
+                "respuesta": "Modo offline activado.",
+                "extracted_contact": {}
+            }
 
         catalogo = self.manager.obtener_catalogo_completo()
         system_prompt_base = self._cargar_system_prompt()
@@ -45,9 +67,22 @@ class BotLogic:
                 model="gpt-4o-mini",
                 messages=mensajes_api,
                 temperature=0.3,
-                max_tokens=250
+                max_tokens=400
             )
-            return response.choices[0].message.content
+            raw_response = response.choices[0].message.content
+            
+            extracted_data = self._parse_extraction_json(raw_response)
+            
+            respuesta_visible = self._strip_extraction_markers(raw_response)
+            
+            return {
+                "respuesta": respuesta_visible,
+                "extracted_contact": extracted_data
+            }
+            
         except Exception as e:
             print(f"Error de conexión con OpenAI: {e}")
-            return "Hubo un error al procesar tu consulta."
+            return {
+                "respuesta": "Hubo un error al procesar tu consulta.",
+                "extracted_contact": {}
+            }

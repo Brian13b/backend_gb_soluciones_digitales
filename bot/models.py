@@ -4,6 +4,11 @@ from shared.models import (
     Message,
     User,
     ContactAttempt,
+    Contact,
+    ContactType,
+    SourceField,
+    ExtractionMethod,
+    ValidationStatus
 )
 
 __all__ = [
@@ -12,4 +17,9 @@ __all__ = [
     "Message",
     "User",
     "ContactAttempt",
+    "Contact",
+    "ContactType",
+    "SourceField",
+    "ExtractionMethod",
+    "ValidationStatus"
 ]

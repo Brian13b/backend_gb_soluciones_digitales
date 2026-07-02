@@ -6,10 +6,6 @@ from datetime import datetime
 from shared.models import Conversation, Message, Contact, SourceField, ExtractionMethod, ValidationStatus
 
 def get_or_create_conversation(db: Session, session_id: str, channel: str = "web"):
-    """
-    Busca la conversación por session_id. Si no existe, la crea.
-    Esto permite la 'omnipresencia' del bot en cualquier sesión que envíes.
-    """
     conversation = db.query(Conversation).filter(
         Conversation.session_id == session_id,
         Conversation.channel == channel
@@ -127,11 +123,6 @@ def save_contact(
 # ==========================================
 
 def update_capture_step(db: Session, conversation_id: uuid.UUID, new_step: str) -> Conversation:
-    """
-    Actualiza el paso de captura en la conversación.
-
-    Pasos válidos: NONE, STEP_1, STEP_2, STEP_3, STEP_4, COMPLETED
-    """
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if conversation:
         conversation.capture_step = new_step
@@ -142,16 +133,9 @@ def update_capture_step(db: Session, conversation_id: uuid.UUID, new_step: str) 
 
 
 def extract_name_from_text(text: str) -> str:
-    """
-    Extrae nombre del texto (búsqueda simple).
-    Busca patrones como: "Soy Juan", "Me llamo Juan", "Juan García"
-
-    Retorna el nombre o None si no encuentra algo convincente.
-    """
     if not text or len(text) < 2:
         return None
 
-    # Patrones comunes
     patterns = [
         r'(?:soy|me llamo|nombre es|es)\s+([A-Z][a-zá-ú]+(?:\s+[A-Z][a-zá-ú]+)?)',
         r'^([A-Z][a-zá-ú]+(?:\s+[A-Z][a-zá-ú]+)?)$'
@@ -166,20 +150,14 @@ def extract_name_from_text(text: str) -> str:
 
 
 def extract_phone_from_text(text: str) -> str:
-    """
-    Extrae teléfono del texto.
-    Busca: +34912345678, +54 9 11 2345 6789, 1234567, etc.
-    """
     if not text:
         return None
 
-    # Buscar patrones de teléfono
     phone_pattern = r'(?:\+\d{1,3}[\s-]?)?\d{7,15}'
     match = re.search(phone_pattern, text)
 
     if match:
         phone = match.group(0)
-        # Limpiar espacios y guiones
         cleaned = re.sub(r'[\s-]', '', phone)
         if _validate_phone(cleaned):
             return cleaned
@@ -188,10 +166,6 @@ def extract_phone_from_text(text: str) -> str:
 
 
 def extract_email_from_text(text: str) -> str:
-    """
-    Extrae email del texto.
-    Busca: user@domain.com
-    """
     if not text:
         return None
 
@@ -207,9 +181,6 @@ def extract_email_from_text(text: str) -> str:
 
 
 def save_name_to_conversation(db: Session, conversation_id: uuid.UUID, name: str) -> Conversation:
-    """
-    Guarda el nombre extraído en contact_name de Conversation (campo legacy).
-    """
     if not name or not isinstance(name, str):
         return None
 
@@ -224,9 +195,6 @@ def save_name_to_conversation(db: Session, conversation_id: uuid.UUID, name: str
 
 
 def save_phone_to_conversation(db: Session, conversation_id: uuid.UUID, phone: str) -> Conversation:
-    """
-    Guarda el teléfono extraído en contact_phone de Conversation (campo legacy).
-    """
     if not phone:
         return None
 
@@ -245,9 +213,6 @@ def save_phone_to_conversation(db: Session, conversation_id: uuid.UUID, phone: s
 
 
 def save_email_to_conversation(db: Session, conversation_id: uuid.UUID, email: str) -> Conversation:
-    """
-    Guarda el email extraído en contact_email de Conversation (campo legacy).
-    """
     if not email or not _validate_email(email):
         return None
 
