@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
+from shared.models import ContactType, ValidationStatus, SourceField, ExtractionMethod
 
 class ChatWebRequest(BaseModel):
     session_id: str = Field(..., description="El ID único del visitante anónimo")
@@ -24,8 +25,9 @@ class ContactSchema(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    contact_type: str
-    validation_status: str
+    
+    contact_type: ContactType
+    validation_status: ValidationStatus
     
     class Config:
         from_attributes = True
