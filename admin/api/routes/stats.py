@@ -12,9 +12,10 @@ def get_stats(
 ):
     """Estadísticas rápidas del panel"""
     total_conversations = db.query(Conversation).count()
-    open_conversations = db.query(Conversation).filter(Conversation.estado == "abierta").count()
-    contacted = db.query(Conversation).filter(Conversation.estado == "contactado").count()
-    closed = db.query(Conversation).filter(Conversation.estado == "cerrada").count()
+    
+    open_conversations = db.query(Conversation).filter(Conversation.estado == "ABIERTA").count()
+    contacted = db.query(Conversation).filter(Conversation.estado == "CONTACTADA").count()
+    closed = db.query(Conversation).filter(Conversation.estado == "FINALIZADA").count()
     
     web_conversations = db.query(Conversation).filter(Conversation.channel == "web").count()
     whatsapp_conversations = db.query(Conversation).filter(Conversation.channel == "whatsapp").count()

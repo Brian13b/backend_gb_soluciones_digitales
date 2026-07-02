@@ -1,7 +1,7 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
+from typing import List
 from shared.models import Conversation, Message
 from shared.schemas import ConversationListSchema, ConversationDetailSchema, MessageSchema
 from admin.api.deps import get_db, get_current_user
@@ -10,7 +10,7 @@ from uuid import UUID
  
 router = APIRouter()
  
-@router.get("", response_model=List[ConversationListSchema])
+@router.get("/conversations", response_model=List[ConversationListSchema])
 def list_conversations(limit: int = 50, estado: str = None, channel: str = None, db: Session = Depends(get_db)):
     query = db.query(Conversation).options(joinedload(Conversation.contacts) )
     
@@ -21,7 +21,7 @@ def list_conversations(limit: int = 50, estado: str = None, channel: str = None,
         
     return query.order_by(Conversation.updated_at.desc()).limit(limit).all()
  
-@router.get("/{conversation_id}", response_model=ConversationDetailSchema)
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetailSchema)
 def get_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
     conversation = db.query(Conversation).options(
         joinedload(Conversation.contacts),
@@ -33,7 +33,7 @@ def get_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
         
     return conversation
  
-@router.patch("/{conversation_id}/estado")
+@router.patch("/conversations/{conversation_id}/estado")
 def update_conversation_estado(conversation_id: UUID, estado: str, db: Session = Depends(get_db)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     
@@ -47,7 +47,7 @@ def update_conversation_estado(conversation_id: UUID, estado: str, db: Session =
     return {"message": "Estado actualizado exitosamente", "estado": conversation.estado}
 
 
-@router.delete("/{conversation_id}")
+@router.delete("/conversations/{conversation_id}")
 def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     
