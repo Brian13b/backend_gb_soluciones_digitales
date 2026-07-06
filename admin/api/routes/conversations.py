@@ -7,6 +7,7 @@ from shared.schemas import ConversationListSchema, ConversationDetailSchema, Mes
 from admin.api.deps import get_db, get_current_user
 from datetime import datetime
 from uuid import UUID
+from shared.models import ContactType
  
 router = APIRouter()
  
@@ -50,11 +51,56 @@ def update_conversation_estado(conversation_id: UUID, estado: str, db: Session =
 @router.delete("/conversations/{conversation_id}")
 def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-    
+
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversación no encontrada")
-        
+
     db.delete(conversation)
     db.commit()
-    
+
     return {"message": "Conversación eliminada exitosamente"}
+
+
+@router.post("/conversations/{conversation_id}/convert-to-client")
+def convert_conversation_to_client(conversation_id: UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    conversation = db.query(Conversation).options(
+        joinedload(Conversation.contacts)
+    ).filter(Conversation.id == conversation_id).first()
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversación no encontrada")
+
+    primary_contact = next((c for c in conversation.contacts if c.contact_type.value == "PRIMARY"), None)
+
+    if not primary_contact or not (primary_contact.name or primary_contact.email or primary_contact.phone):
+        raise HTTPException(
+            status_code=400,
+            detail="La conversación debe tener un contacto primario con nombre, email o teléfono"
+        )
+
+    from shared.models import Client
+
+    new_client = Client(
+        name=primary_contact.name or f"Cliente {conversation_id}",
+        email=primary_contact.email,
+        phone=primary_contact.phone,
+        conversation_id=conversation_id,
+        status="lead",
+        source="conversation"
+    )
+
+    db.add(new_client)
+    db.commit()
+    db.refresh(new_client)
+
+    return {
+        "message": "Conversación convertida a cliente exitosamente",
+        "client_id": str(new_client.id),
+        "client": {
+            "id": new_client.id,
+            "name": new_client.name,
+            "email": new_client.email,
+            "phone": new_client.phone,
+            "status": new_client.status
+        }
+    }
