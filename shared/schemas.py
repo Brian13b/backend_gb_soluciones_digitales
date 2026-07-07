@@ -51,7 +51,7 @@ class ConversationListSchema(BaseModel):
     session_id: str
     channel: str
     estado: str
-    message_count: int = 0
+    message_count: int
     contacts: List[ContactSchema] = []
     last_message_at: Optional[datetime] = None
     created_at: datetime

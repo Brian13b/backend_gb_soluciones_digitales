@@ -134,7 +134,7 @@ class Client(Base):
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
     conversation = relationship("Conversation")
-    projects = relationship("Project", back_populates="client", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="client")
 
     def __repr__(self):
         return f"<Client(name='{self.name}', email='{self.email}', status='{self.status}')>"

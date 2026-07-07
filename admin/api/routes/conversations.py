@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 from typing import List
 from shared.models import Conversation, Message
 from shared.schemas import ConversationListSchema, ConversationDetailSchema, MessageSchema
@@ -13,14 +13,34 @@ router = APIRouter()
  
 @router.get("/conversations", response_model=List[ConversationListSchema])
 def list_conversations(limit: int = 50, estado: str = None, channel: str = None, db: Session = Depends(get_db)):
-    query = db.query(Conversation).options(joinedload(Conversation.contacts) )
-    
+    query = db.query(Conversation).options(
+        joinedload(Conversation.contacts)
+    )
+
     if estado:
         query = query.filter(Conversation.estado == estado)
     if channel:
         query = query.filter(Conversation.channel == channel)
-        
-    return query.order_by(Conversation.updated_at.desc()).limit(limit).all()
+
+    conversations = query.order_by(Conversation.updated_at.desc()).limit(limit).all()
+
+    conversation_ids = [c.id for c in conversations]
+    if conversation_ids:
+        message_counts = db.query(
+            Message.conversation_id,
+            func.count(Message.id).label('count')
+        ).filter(Message.conversation_id.in_(conversation_ids)).group_by(
+            Message.conversation_id
+        ).all()
+        counts_map = {cid: count for cid, count in message_counts}
+
+        for conversation in conversations:
+            conversation.message_count = counts_map.get(conversation.id, 0)
+    else:
+        for conversation in conversations:
+            conversation.message_count = 0
+
+    return conversations
  
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailSchema)
 def get_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
@@ -63,12 +83,22 @@ def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
 
 @router.post("/conversations/{conversation_id}/convert-to-client")
 def convert_conversation_to_client(conversation_id: UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    from shared.models import Client
+
     conversation = db.query(Conversation).options(
         joinedload(Conversation.contacts)
     ).filter(Conversation.id == conversation_id).first()
 
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversación no encontrada")
+
+    existing_client = db.query(Client).filter(Client.conversation_id == conversation_id).first()
+    if existing_client:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta conversación ya fue convertida a cliente",
+            headers={"X-Client-ID": str(existing_client.id)}
+        )
 
     primary_contact = next((c for c in conversation.contacts if c.contact_type.value == "PRIMARY"), None)
 
@@ -77,8 +107,6 @@ def convert_conversation_to_client(conversation_id: UUID, db: Session = Depends(
             status_code=400,
             detail="La conversación debe tener un contacto primario con nombre, email o teléfono"
         )
-
-    from shared.models import Client
 
     new_client = Client(
         name=primary_contact.name or f"Cliente {conversation_id}",
