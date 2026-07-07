@@ -10,7 +10,6 @@ from admin.models import User
 
 router = APIRouter()
 
-
 @router.get("/clients", response_model=List[ClientListResponse])
 def list_clients(
     status: str = Query(None),
@@ -23,7 +22,6 @@ def list_clients(
         query = query.filter(Client.status == status)
 
     return query.order_by(Client.updated_at.desc()).all()
-
 
 @router.get("/clients/{client_id}", response_model=ClientResponse)
 def get_client(
@@ -38,7 +36,6 @@ def get_client(
 
     return client
 
-
 @router.post("/clients", response_model=ClientResponse, status_code=201)
 def create_client(
     client_data: ClientCreate,
@@ -51,7 +48,6 @@ def create_client(
     db.refresh(db_client)
 
     return db_client
-
 
 @router.patch("/clients/{client_id}", response_model=ClientResponse)
 def update_client(
@@ -73,7 +69,6 @@ def update_client(
     db.refresh(client)
 
     return client
-
 
 @router.delete("/clients/{client_id}")
 def delete_client(

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 import uuid
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from shared.models import Conversation, Message, Contact, SourceField, ExtractionMethod, ValidationStatus
 
@@ -19,16 +19,13 @@ def get_or_create_conversation(db: Session, session_id: str, channel: str = "web
     
     return conversation
 
-def update_conversation_state(db: Session, conversation_id: uuid.UUID, contact_info: str = None, estado: str = "B"):
+def update_conversation_state(db: Session, conversation_id: uuid.UUID, estado: str = "B"):
     """
-    Actualiza la conversación cuando se detecta un cambio de estado o se captura el lead.
+    Actualiza el estado de la conversación cuando se captura un lead.
     """
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if conversation:
-        if contact_info:
-            conversation.contact_info = contact_info
-        if estado:
-            conversation.estado = estado
+        conversation.estado = estado
         db.commit()
         db.refresh(conversation)
     return conversation
@@ -118,20 +115,6 @@ def save_contact(
     return contact
 
 
-# ==========================================
-# STATE MACHINE FUNCTIONS (Capture Steps)
-# ==========================================
-
-def update_capture_step(db: Session, conversation_id: uuid.UUID, new_step: str) -> Conversation:
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-    if conversation:
-        conversation.capture_step = new_step
-        conversation.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(conversation)
-    return conversation
-
-
 def extract_name_from_text(text: str) -> str:
     if not text or len(text) < 2:
         return None
@@ -178,49 +161,3 @@ def extract_email_from_text(text: str) -> str:
             return email
 
     return None
-
-
-def save_name_to_conversation(db: Session, conversation_id: uuid.UUID, name: str) -> Conversation:
-    if not name or not isinstance(name, str):
-        return None
-
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-    if conversation:
-        conversation.contact_name = name.strip()
-        conversation.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(conversation)
-
-    return conversation
-
-
-def save_phone_to_conversation(db: Session, conversation_id: uuid.UUID, phone: str) -> Conversation:
-    if not phone:
-        return None
-
-    cleaned_phone = re.sub(r'[^\d+]', '', phone)
-    if not _validate_phone(cleaned_phone):
-        return None
-
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-    if conversation:
-        conversation.contact_phone = cleaned_phone
-        conversation.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(conversation)
-
-    return conversation
-
-
-def save_email_to_conversation(db: Session, conversation_id: uuid.UUID, email: str) -> Conversation:
-    if not email or not _validate_email(email):
-        return None
-
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-    if conversation:
-        conversation.contact_email = email
-        conversation.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(conversation)
-
-    return conversation
