@@ -12,14 +12,14 @@ def get_or_create_conversation(db: Session, session_id: str, channel: str = "web
     ).first()
 
     if not conversation:
-        conversation = Conversation(session_id=session_id, channel=channel)
+        conversation = Conversation(session_id=session_id, channel=channel, estado="ABIERTA")
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
     
     return conversation
 
-def update_conversation_state(db: Session, conversation_id: uuid.UUID, estado: str = "B"):
+def update_conversation_state(db: Session, conversation_id: uuid.UUID, estado: str = "CONTACTADA"):
     """
     Actualiza el estado de la conversación cuando se captura un lead.
     """

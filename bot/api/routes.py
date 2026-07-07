@@ -40,8 +40,8 @@ async def chat_web(request_data: ChatWebRequest, db: Session = Depends(get_db)):
                 confidence_score=confidence
             )
             if contact and (contact.email or contact.phone):
-                crud.update_conversation_state(db, conversation.id, estado="B")
-                conversation.estado = "B"
+                crud.update_conversation_state(db, conversation.id, estado="CONTACTADA")
+                conversation.estado = "CONTACTADA"
 
     crud.add_message(db, conversation.id, role="assistant", content=respuesta_ia)
 
@@ -120,8 +120,8 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
                             confidence_score=confidence
                         )
                         if contact and (contact.email or contact.phone):
-                            crud.update_conversation_state(db, conversation.id, estado="B")
-                            conversation.estado = "B"
+                            crud.update_conversation_state(db, conversation.id, estado="CONTACTADA")
+                            conversation.estado = "CONTACTADA"
 
                 crud.add_message(db, conversation.id, role="assistant", content=respuesta_ia)
                 await enviar_mensaje_whatsapp(numero_cliente, respuesta_ia)

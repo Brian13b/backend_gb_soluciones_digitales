@@ -50,7 +50,7 @@ class Conversation(Base):
     session_id = Column(String(255), unique=True, nullable=False, index=True)
     channel = Column(String(50), nullable=False)
 
-    estado = Column(String(50), default="A", index=True)
+    estado = Column(String(50), default="ABIERTA", index=True)
     proyecto_id = Column(UUID(as_uuid=True), nullable=True)
 
     created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
