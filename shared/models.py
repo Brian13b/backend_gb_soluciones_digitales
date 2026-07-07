@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy import Column, String, DateTime, Boolean, Text, ForeignKey, func, Float, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime, timezone
 import enum
@@ -161,6 +161,7 @@ class Project(Base):
     display_order = Column(Float, default=0)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
+    deployment_info = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 

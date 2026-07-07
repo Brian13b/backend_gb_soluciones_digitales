@@ -95,6 +95,7 @@ class ProjectCreate(BaseModel):
     display_order: float = 0
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+    deployment_info: Optional[dict] = {}
 
 class ProjectUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -115,6 +116,7 @@ class ProjectUpdate(BaseModel):
     display_order: Optional[float] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+    deployment_info: Optional[dict] = None
 
 class ProjectResponse(BaseModel):
     id: UUID
@@ -136,6 +138,7 @@ class ProjectResponse(BaseModel):
     display_order: float
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+    deployment_info: Optional[dict] = None  
     created_at: datetime
     updated_at: datetime
 
