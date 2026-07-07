@@ -67,7 +67,6 @@ def update_conversation_estado(conversation_id: UUID, estado: str, db: Session =
     
     return {"message": "Estado actualizado exitosamente", "estado": conversation.estado}
 
-
 @router.delete("/conversations/{conversation_id}")
 def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
@@ -79,7 +78,6 @@ def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Conversación eliminada exitosamente"}
-
 
 @router.post("/conversations/{conversation_id}/convert-to-client")
 def convert_conversation_to_client(conversation_id: UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
