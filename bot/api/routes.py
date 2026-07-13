@@ -1,6 +1,6 @@
 import httpx
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 
@@ -84,6 +84,115 @@ async def chat_web(request_data: ChatWebRequest, db: Session = Depends(get_db)):
         estado_actual=conversation.estado
     )
 
+async def procesar_whatsapp_background(numero_cliente: str, mensaje_usuario: str):
+    db_gen = get_db()
+    db = next(db_gen)
+    try:
+        conversation = crud.get_or_create_conversation(db, session_id=numero_cliente, channel="whatsapp")
+        
+        now = datetime.now(timezone.utc)
+        db_updated_at = conversation.updated_at
+        if db_updated_at.tzinfo is None:
+            db_updated_at = db_updated_at.replace(tzinfo=timezone.utc)
+        
+        tiempo_inactivo = (now - db_updated_at).total_seconds()
+
+        tiempo_limite_spam = now - timedelta(minutes=MINUTOS_VENTANA)
+        mensajes_recientes = db.query(Message).filter(
+            Message.conversation_id == conversation.id,
+            Message.role == "user",
+            Message.created_at >= tiempo_limite_spam
+        ).count()
+
+        if mensajes_recientes >= LIMITE_MENSAJES:
+            if mensajes_recientes == LIMITE_MENSAJES:
+                await enviar_mensaje_whatsapp(numero_cliente, "Estás enviando demasiados mensajes. Por favor, esperá unos minutos.")
+            return
+
+        if db.query(Message).filter(Message.conversation_id == conversation.id).count() == 0:
+            bienvenida = "¡Hola! Soy GiBi, el asistente virtual de GB Soluciones Digitales. ¿En qué te puedo ayudar hoy?"
+            crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
+            crud.add_message(db, conversation.id, role="assistant", content=bienvenida)
+            await enviar_mensaje_whatsapp(numero_cliente, bienvenida)
+            return
+        
+        mensaje_db = crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
+        
+        await asyncio.sleep(5)
+        
+        ultimo_mensaje = db.query(Message).filter(
+            Message.conversation_id == conversation.id,
+            Message.role == "user"
+        ).order_by(Message.created_at.desc()).first()
+        
+        if mensaje_db.id != ultimo_mensaje.id:
+            print("Fragmento detectado en WhatsApp. Delegando al último mensaje...")
+            return
+            
+        ultimo_asistente = db.query(Message).filter(
+            Message.conversation_id == conversation.id,
+            Message.role == "assistant"
+        ).order_by(Message.created_at.desc()).first()
+        
+        query_fragmentos = db.query(Message).filter(Message.conversation_id == conversation.id, Message.role == "user")
+        if ultimo_asistente:
+            query_fragmentos = query_fragmentos.filter(Message.created_at > ultimo_asistente.created_at)
+            
+        fragmentos = query_fragmentos.order_by(Message.created_at.asc()).all()
+        mensaje_unificado = " ".join([msg.content for msg in fragmentos])
+        print(f"✅ Unificando mensajes para enviar al LLM: '{mensaje_unificado}'")
+
+        if tiempo_inactivo > 86400:
+            history = []
+        else:
+            history = crud.get_conversation_history(db, conversation.id)
+            history = [msg for msg in history if msg.get("role") != "user" or msg.get("content") == mensaje_unificado]
+
+        contacto_existente = db.query(Contact).filter(Contact.conversation_id == conversation.id).first()
+        datos_confirmados = {}
+        if contacto_existente:
+            if contacto_existente.name: datos_confirmados['nombre'] = contacto_existente.name
+            if contacto_existente.email: datos_confirmados['email'] = contacto_existente.email
+            if contacto_existente.phone: datos_confirmados['teléfono'] = contacto_existente.phone
+
+        bot_output = bot.procesar(
+            mensaje_unificado, 
+            history=history, 
+            channel="whatsapp",
+            datos_confirmados=datos_confirmados,
+            webhook_phone=numero_cliente
+        )
+        
+        respuesta_ia = bot_output.get("respuesta", "Hubo un error al procesar tu consulta.")
+        extracted_contact = bot_output.get("extracted_contact", {})
+
+        if extracted_contact:
+            name = extracted_contact.get("name")
+            email = extracted_contact.get("email")
+            phone = extracted_contact.get("phone")
+            confidence = extracted_contact.get("extraction_confidence", 0.0)
+
+            if name or email or phone:
+                contact = crud.save_contact(
+                    db=db,
+                    conversation_id=conversation.id,
+                    name=name,
+                    email=email,
+                    phone=phone,
+                    confidence_score=confidence
+                )
+                if contact and (contact.email or contact.phone):
+                    crud.update_conversation_state(db, conversation.id, estado="CONTACTADA")
+                    conversation.estado = "CONTACTADA"
+
+        crud.add_message(db, conversation.id, role="assistant", content=respuesta_ia)
+        await enviar_mensaje_whatsapp(numero_cliente, respuesta_ia)
+            
+    except Exception as e:
+        print(f"❌ Error en el procesamiento en segundo plano: {e}")
+    finally:
+        db.close()
+
 @router.get("/webhook")
 async def verify_webhook(request: Request):
     mode = request.query_params.get("hub.mode")
@@ -96,7 +205,7 @@ async def verify_webhook(request: Request):
     raise HTTPException(status_code=403, detail="❌ Error de verificación del webhook")
 
 @router.post("/webhook")
-async def handle_message(request: Request, db: Session = Depends(get_db)):
+async def handle_message(request: Request, background_tasks: BackgroundTasks):
     body = await request.body()
     x_hub_signature_256 = request.headers.get("X-Hub-Signature-256")
 
@@ -117,104 +226,7 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
                 mensaje_usuario = mensaje_obj.get("text", {}).get("body", "")
                 numero_cliente = mensaje_obj.get("from")
                 
-                conversation = crud.get_or_create_conversation(db, session_id=numero_cliente, channel="whatsapp")
-                
-                now = datetime.now(timezone.utc)
-                db_updated_at = conversation.updated_at
-                if db_updated_at.tzinfo is None:
-                    db_updated_at = db_updated_at.replace(tzinfo=timezone.utc)
-                
-                tiempo_inactivo = (now - db_updated_at).total_seconds()
-
-                tiempo_limite_spam = now - timedelta(minutes=MINUTOS_VENTANA)
-                mensajes_recientes = db.query(Message).filter(
-                    Message.conversation_id == conversation.id,
-                    Message.role == "user",
-                    Message.created_at >= tiempo_limite_spam
-                ).count()
-
-                if mensajes_recientes >= LIMITE_MENSAJES:
-                    if mensajes_recientes == LIMITE_MENSAJES:
-                        await enviar_mensaje_whatsapp(numero_cliente, "Estás enviando demasiados mensajes. Por favor, esperá unos minutos.")
-                    return {"status": "rate_limited"}
-
-                if db.query(Message).filter(Message.conversation_id == conversation.id).count() == 0:
-                    bienvenida = "¡Hola! Soy GiBi, el asistente virtual de GB Soluciones Digitales. ¿En qué te puedo ayudar hoy?"
-                    crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
-                    crud.add_message(db, conversation.id, role="assistant", content=bienvenida)
-                    await enviar_mensaje_whatsapp(numero_cliente, bienvenida)
-                    return {"status": "ok"}
-                
-                mensaje_db = crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
-                
-                await asyncio.sleep(5)
-                
-                ultimo_mensaje = db.query(Message).filter(
-                    Message.conversation_id == conversation.id,
-                    Message.role == "user"
-                ).order_by(Message.created_at.desc()).first()
-                
-                if mensaje_db.id != ultimo_mensaje.id:
-                    print("Fragmento detectado en WhatsApp. Delegando...")
-                    return {"status": "debounced"}
-                    
-                ultimo_asistente = db.query(Message).filter(
-                    Message.conversation_id == conversation.id,
-                    Message.role == "assistant"
-                ).order_by(Message.created_at.desc()).first()
-                
-                query_fragmentos = db.query(Message).filter(Message.conversation_id == conversation.id, Message.role == "user")
-                if ultimo_asistente:
-                    query_fragmentos = query_fragmentos.filter(Message.created_at > ultimo_asistente.created_at)
-                    
-                fragmentos = query_fragmentos.order_by(Message.created_at.asc()).all()
-                mensaje_unificado = " ".join([msg.content for msg in fragmentos])
-
-                if tiempo_inactivo > 86400:
-                    history = []
-                else:
-                    history = crud.get_conversation_history(db, conversation.id)
-                    history = [msg for msg in history if msg.get("role") != "user" or msg.get("content") == mensaje_unificado]
-
-                contacto_existente = db.query(Contact).filter(Contact.conversation_id == conversation.id).first()
-                datos_confirmados = {}
-                if contacto_existente:
-                    if contacto_existente.name: datos_confirmados['nombre'] = contacto_existente.name
-                    if contacto_existente.email: datos_confirmados['email'] = contacto_existente.email
-                    if contacto_existente.phone: datos_confirmados['teléfono'] = contacto_existente.phone
-
-                bot_output = bot.procesar(
-                    mensaje_unificado, 
-                    history=history, 
-                    channel="whatsapp",
-                    datos_confirmados=datos_confirmados,
-                    webhook_phone=numero_cliente
-                )
-                
-                respuesta_ia = bot_output.get("respuesta", "Hubo un error al procesar tu consulta.")
-                extracted_contact = bot_output.get("extracted_contact", {})
-
-                if extracted_contact:
-                    name = extracted_contact.get("name")
-                    email = extracted_contact.get("email")
-                    phone = extracted_contact.get("phone")
-                    confidence = extracted_contact.get("extraction_confidence", 0.0)
-
-                    if name or email or phone:
-                        contact = crud.save_contact(
-                            db=db,
-                            conversation_id=conversation.id,
-                            name=name,
-                            email=email,
-                            phone=phone,
-                            confidence_score=confidence
-                        )
-                        if contact and (contact.email or contact.phone):
-                            crud.update_conversation_state(db, conversation.id, estado="CONTACTADA")
-                            conversation.estado = "CONTACTADA"
-
-                crud.add_message(db, conversation.id, role="assistant", content=respuesta_ia)
-                await enviar_mensaje_whatsapp(numero_cliente, respuesta_ia)
+                background_tasks.add_task(procesar_whatsapp_background, numero_cliente, mensaje_usuario)
                 
     except Exception as e:
         print(f"Error parseando el webhook de Meta: {e}")
