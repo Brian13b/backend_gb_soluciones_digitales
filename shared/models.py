@@ -35,8 +35,8 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     contact_attempts = relationship("ContactAttempt", back_populates="developer")
 
@@ -53,8 +53,8 @@ class Conversation(Base):
     estado = Column(String(50), default="ABIERTA", index=True)
     proyecto_id = Column(UUID(as_uuid=True), nullable=True)
 
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
     contacts = relationship("Contact", back_populates="conversation", cascade="all, delete-orphan")
@@ -70,7 +70,7 @@ class Message(Base):
     conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
     role = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     conversation = relationship("Conversation", back_populates="messages")
 
@@ -94,7 +94,7 @@ class Contact(Base):
     confidence_score = Column(Float, default=0.0)
 
     captured_by = Column(String(50), nullable=False)
-    captured_at = Column(DateTime, default=datetime.now(timezone.utc))
+    captured_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     validated_at = Column(DateTime, nullable=True)
 
     conversation = relationship("Conversation", back_populates="contacts")
@@ -110,7 +110,7 @@ class ContactAttempt(Base):
     developer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     method = Column(String(50), nullable=False)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     conversation = relationship("Conversation", back_populates="contact_attempts")
     developer = relationship("User", back_populates="contact_attempts")
@@ -130,8 +130,8 @@ class Client(Base):
     notes = Column(Text, nullable=True)
     source = Column(String(50), default="manual")
     conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     conversation = relationship("Conversation")
     projects = relationship("Project", back_populates="client")
@@ -162,8 +162,8 @@ class Project(Base):
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     deployment_info = Column(JSONB, default=dict)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc), index=True)
-    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     client = relationship("Client", back_populates="projects")
 

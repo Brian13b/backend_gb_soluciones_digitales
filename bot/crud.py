@@ -28,14 +28,23 @@ def update_conversation_state(db: Session, conversation_id: uuid.UUID, estado: s
     return conversation
 
 def add_message(db: Session, conversation_id: uuid.UUID, role: str, content: str):
+    ahora = datetime.now(timezone.utc)
+
     message = Message(
         conversation_id=conversation_id,
         role=role,
-        content=content
+        content=content,
+        created_at=ahora
     )
+
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if conversation:
+        conversation.updated_at = ahora
+
     db.add(message)
     db.commit()
     db.refresh(message)
+    
     return message
 
 def get_conversation_history(db: Session, conversation_id: uuid.UUID, limit: int = 20):
