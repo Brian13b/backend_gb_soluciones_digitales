@@ -14,7 +14,11 @@ def get_or_create_conversation(db: Session, session_id: str, channel: str = "web
     now = datetime.now(timezone.utc)
 
     if conversation:
-        time_diff = now - conversation.updated_at
+        db_updated_at = conversation.updated_at
+        if db_updated_at.tzinfo is None:
+            db_updated_at = db_updated_at.replace(tzinfo=timezone.utc)
+
+        time_diff = now - db_updated_at
         if time_diff < timedelta(hours=24):
             return conversation
         
