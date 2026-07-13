@@ -38,7 +38,7 @@ def add_message(db: Session, conversation_id: uuid.UUID, role: str, content: str
     db.refresh(message)
     return message
 
-def get_conversation_history(db: Session, conversation_id: uuid.UUID, limit: int = 8):
+def get_conversation_history(db: Session, conversation_id: uuid.UUID, limit: int = 20):
     messages = db.query(Message).filter(Message.conversation_id == conversation_id)\
                  .order_by(Message.created_at.asc())\
                  .limit(limit).all()

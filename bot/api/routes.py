@@ -1,4 +1,5 @@
 import httpx
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
@@ -85,7 +86,6 @@ async def chat_web(request_data: ChatWebRequest, db: Session = Depends(get_db)):
 
 @router.get("/webhook")
 async def verify_webhook(request: Request):
-    """Ruta de verificación para Meta"""
     mode = request.query_params.get("hub.mode")
     token = request.query_params.get("hub.verify_token")
     challenge = request.query_params.get("hub.challenge")
@@ -101,10 +101,7 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
     x_hub_signature_256 = request.headers.get("X-Hub-Signature-256")
 
     if not verify_webhook_signature(body, x_hub_signature_256):
-        raise HTTPException(
-            status_code=401,
-            detail="❌ Firma de webhook inválida. Acceso denegado."
-        )
+        raise HTTPException(status_code=401, detail="❌ Firma de webhook inválida.")
 
     data = await request.json()
     
@@ -120,10 +117,7 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
                 mensaje_usuario = mensaje_obj.get("text", {}).get("body", "")
                 numero_cliente = mensaje_obj.get("from")
                 
-                print(f"Mensaje entrante de {numero_cliente}: {mensaje_usuario}")
-                
                 conversation = crud.get_or_create_conversation(db, session_id=numero_cliente, channel="whatsapp")
-                history = crud.get_conversation_history(db, conversation.id)
                 
                 now = datetime.now(timezone.utc)
                 db_updated_at = conversation.updated_at
@@ -140,25 +134,47 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
                 ).count()
 
                 if mensajes_recientes >= LIMITE_MENSAJES:
-                    print(f"⚠️ SPAM DETECTADO (WhatsApp): El número {numero_cliente} fue bloqueado temporalmente.")
-                    
                     if mensajes_recientes == LIMITE_MENSAJES:
-                        advertencia = "Estás enviando demasiados mensajes. Por favor, esperá unos minutos antes de volver a escribir."
-                        await enviar_mensaje_whatsapp(numero_cliente, advertencia)
-                        
+                        await enviar_mensaje_whatsapp(numero_cliente, "Estás enviando demasiados mensajes. Por favor, esperá unos minutos.")
                     return {"status": "rate_limited"}
-                
-                if len(history) == 0:
+
+                if db.query(Message).filter(Message.conversation_id == conversation.id).count() == 0:
                     bienvenida = "¡Hola! Soy GiBi, el asistente virtual de GB Soluciones Digitales. ¿En qué te puedo ayudar hoy?"
                     crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
                     crud.add_message(db, conversation.id, role="assistant", content=bienvenida)
                     await enviar_mensaje_whatsapp(numero_cliente, bienvenida)
                     return {"status": "ok"}
                 
+                mensaje_db = crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
+                
+                await asyncio.sleep(5)
+                
+                ultimo_mensaje = db.query(Message).filter(
+                    Message.conversation_id == conversation.id,
+                    Message.role == "user"
+                ).order_by(Message.created_at.desc()).first()
+                
+                if mensaje_db.id != ultimo_mensaje.id:
+                    print("Fragmento detectado en WhatsApp. Delegando...")
+                    return {"status": "debounced"}
+                    
+                ultimo_asistente = db.query(Message).filter(
+                    Message.conversation_id == conversation.id,
+                    Message.role == "assistant"
+                ).order_by(Message.created_at.desc()).first()
+                
+                query_fragmentos = db.query(Message).filter(Message.conversation_id == conversation.id, Message.role == "user")
+                if ultimo_asistente:
+                    query_fragmentos = query_fragmentos.filter(Message.created_at > ultimo_asistente.created_at)
+                    
+                fragmentos = query_fragmentos.order_by(Message.created_at.asc()).all()
+                mensaje_unificado = " ".join([msg.content for msg in fragmentos])
+
                 if tiempo_inactivo > 86400:
                     history = []
-                
-                crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
+                else:
+                    history = crud.get_conversation_history(db, conversation.id)
+                    history = [msg for msg in history if msg.get("role") != "user" or msg.get("content") == mensaje_unificado]
 
                 contacto_existente = db.query(Contact).filter(Contact.conversation_id == conversation.id).first()
                 datos_confirmados = {}
@@ -168,7 +184,7 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
                     if contacto_existente.phone: datos_confirmados['teléfono'] = contacto_existente.phone
 
                 bot_output = bot.procesar(
-                    mensaje_usuario, 
+                    mensaje_unificado, 
                     history=history, 
                     channel="whatsapp",
                     datos_confirmados=datos_confirmados,
