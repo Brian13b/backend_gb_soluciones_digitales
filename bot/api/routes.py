@@ -1,24 +1,43 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone, timedelta
 
 from bot.database import get_db
 from shared.schemas import ChatWebRequest, ChatResponse
-from shared.models import Contact
 from bot import crud
 from bot.bot_logic import BotLogic
 from bot.core.config import settings
 from bot.core.security import verify_webhook_signature
+from shared.models import Contact, Message
 
 router = APIRouter()
 bot = BotLogic()
+
+LIMITE_MENSAJES = 20
+MINUTOS_VENTANA = 3
 
 @router.post("/chat-web", response_model=ChatResponse)
 async def chat_web(request_data: ChatWebRequest, db: Session = Depends(get_db)):
     conversation = crud.get_or_create_conversation(db, request_data.session_id, channel="web")
 
-    crud.add_message(db, conversation.id, role="user", content=request_data.mensaje)
+    now = datetime.now(timezone.utc)
+    tiempo_limite = now - timedelta(minutes=MINUTOS_VENTANA)
+    
+    mensajes_recientes = db.query(Message).filter(
+        Message.conversation_id == conversation.id,
+        Message.role == "user",
+        Message.created_at >= tiempo_limite
+    ).count()
 
+    if mensajes_recientes >= LIMITE_MENSAJES:
+        print(f"⚠️ SPAM DETECTADO (Web): Sesión {request_data.session_id} bloqueada temporalmente.")
+        return ChatResponse(
+            respuesta="Estás enviando demasiados mensajes. Por favor, esperá unos minutos antes de volver a escribir.",
+            estado_actual=conversation.estado
+        )
+
+    crud.add_message(db, conversation.id, role="user", content=request_data.mensaje)
     history = crud.get_conversation_history(db, conversation.id)
 
     contacto_existente = db.query(Contact).filter(Contact.conversation_id == conversation.id).first()
@@ -28,7 +47,13 @@ async def chat_web(request_data: ChatWebRequest, db: Session = Depends(get_db)):
         if contacto_existente.email: datos_confirmados['email'] = contacto_existente.email
         if contacto_existente.phone: datos_confirmados['teléfono'] = contacto_existente.phone
 
-    bot_output = bot.procesar(request_data.mensaje, history=history, channel="web", datos_confirmados=datos_confirmados)
+    bot_output = bot.procesar(
+        request_data.mensaje, 
+        history=history, 
+        channel="web",
+        datos_confirmados=datos_confirmados
+    )
+    
     respuesta_ia = bot_output.get("respuesta", "Hubo un error al procesar tu consulta.")
     extracted_contact = bot_output.get("extracted_contact", {})
 
@@ -100,11 +125,38 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
                 conversation = crud.get_or_create_conversation(db, session_id=numero_cliente, channel="whatsapp")
                 history = crud.get_conversation_history(db, conversation.id)
                 
+                now = datetime.now(timezone.utc)
+                db_updated_at = conversation.updated_at
+                if db_updated_at.tzinfo is None:
+                    db_updated_at = db_updated_at.replace(tzinfo=timezone.utc)
+                
+                tiempo_inactivo = (now - db_updated_at).total_seconds()
+
+                tiempo_limite_spam = now - timedelta(minutes=MINUTOS_VENTANA)
+                mensajes_recientes = db.query(Message).filter(
+                    Message.conversation_id == conversation.id,
+                    Message.role == "user",
+                    Message.created_at >= tiempo_limite_spam
+                ).count()
+
+                if mensajes_recientes >= LIMITE_MENSAJES:
+                    print(f"⚠️ SPAM DETECTADO (WhatsApp): El número {numero_cliente} fue bloqueado temporalmente.")
+                    
+                    if mensajes_recientes == LIMITE_MENSAJES:
+                        advertencia = "Estás enviando demasiados mensajes. Por favor, esperá unos minutos antes de volver a escribir."
+                        await enviar_mensaje_whatsapp(numero_cliente, advertencia)
+                        
+                    return {"status": "rate_limited"}
+                
                 if len(history) == 0:
                     bienvenida = "¡Hola! Soy GiBi, el asistente virtual de GB Soluciones Digitales. ¿En qué te puedo ayudar hoy?"
+                    crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
                     crud.add_message(db, conversation.id, role="assistant", content=bienvenida)
                     await enviar_mensaje_whatsapp(numero_cliente, bienvenida)
                     return {"status": "ok"}
+                
+                if tiempo_inactivo > 86400:
+                    history = []
                 
                 crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
 
@@ -114,8 +166,15 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
                     if contacto_existente.name: datos_confirmados['nombre'] = contacto_existente.name
                     if contacto_existente.email: datos_confirmados['email'] = contacto_existente.email
                     if contacto_existente.phone: datos_confirmados['teléfono'] = contacto_existente.phone
+
+                bot_output = bot.procesar(
+                    mensaje_usuario, 
+                    history=history, 
+                    channel="whatsapp",
+                    datos_confirmados=datos_confirmados,
+                    webhook_phone=numero_cliente
+                )
                 
-                bot_output = bot.procesar(mensaje_usuario, history=history, channel="whatsapp", datos_confirmados=datos_confirmados, webhook_phone=numero_cliente)
                 respuesta_ia = bot_output.get("respuesta", "Hubo un error al procesar tu consulta.")
                 extracted_contact = bot_output.get("extracted_contact", {})
 
