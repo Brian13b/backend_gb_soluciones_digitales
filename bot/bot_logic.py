@@ -59,7 +59,7 @@ class BotLogic:
         system_prompt += f"\n\nCONTEXTO DE CANAL: El usuario se comunica a través de {channel}."
 
         if webhook_phone:
-            system_prompt += f"\nEl número de teléfono de origen del usuario es: {webhook_phone}. Si el usuario indica 'este mismo', 'el mío' o similar al pedirle su número, DEBES extraer exactamente este número en el JSON."
+            system_prompt += f"\nEl número de teléfono de origen del usuario es: {webhook_phone} (ya en formato E.164, con '+'). Si el usuario indica 'este mismo', 'el mío' o similar al pedirle su número, DEBES extraer exactamente este número, en este mismo formato, en el JSON."
 
         if datos_confirmados:
             system_prompt += f"\n\nREGLA ESTRICTA - DATOS YA CONFIRMADOS DEL USUARIO:\n"
