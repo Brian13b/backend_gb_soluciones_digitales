@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 import uuid
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from shared.models import Conversation, Message, Contact, SourceField, ExtractionMethod, ValidationStatus
 
@@ -9,15 +9,21 @@ def get_or_create_conversation(db: Session, session_id: str, channel: str = "web
     conversation = db.query(Conversation).filter(
         Conversation.session_id == session_id,
         Conversation.channel == channel
-    ).first()
+    ).order_by(Conversation.updated_at.desc()).first()
 
-    if not conversation:
-        conversation = Conversation(session_id=session_id, channel=channel, estado="ABIERTA")
-        db.add(conversation)
-        db.commit()
-        db.refresh(conversation)
+    now = datetime.now(timezone.utc)
+
+    if conversation:
+        time_diff = now - conversation.updated_at
+        if time_diff < timedelta(hours=24):
+            return conversation
+        
+    new_conversation = Conversation(session_id=session_id, channel=channel, estado="ABIERTA")
+    db.add(new_conversation)
+    db.commit()
+    db.refresh(new_conversation)
     
-    return conversation
+    return new_conversation
 
 def update_conversation_state(db: Session, conversation_id: uuid.UUID, estado: str = "CONTACTADA"):
     """

@@ -6,7 +6,7 @@ class Settings:
     
     SECRET_KEY: str = os.getenv("SECRET_KEY")
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 horas
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 960  
     
     API_TITLE: str = "GB Admin Panel API"
     API_VERSION: str = "1.0.0"

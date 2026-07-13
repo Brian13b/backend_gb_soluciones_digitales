@@ -45,7 +45,7 @@ class BotLogic:
         clean_text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE).strip()
         return clean_text
 
-    def procesar(self, mensaje, history=[], channel="web"):
+    def procesar(self, mensaje, history=[], channel="web", datos_confirmados=None, webhook_phone=None):
         if not self.client:
             return {
                 "respuesta": "Modo offline activado.",
@@ -58,6 +58,15 @@ class BotLogic:
         system_prompt = system_prompt_base.replace("{catalogo}", catalogo)
         system_prompt += f"\n\nCONTEXTO DE CANAL: El usuario se comunica a través de {channel}."
 
+        if webhook_phone:
+            system_prompt += f"\nEl número de teléfono de origen del usuario es: {webhook_phone}. Si el usuario indica 'este mismo', 'el mío' o similar al pedirle su número, DEBES extraer exactamente este número en el JSON."
+
+        if datos_confirmados:
+            system_prompt += f"\n\nREGLA ESTRICTA - DATOS YA CONFIRMADOS DEL USUARIO:\n"
+            for campo, valor in datos_confirmados.items():
+                if valor:
+                    system_prompt += f"- {campo.capitalize()}: {valor} (NO vuelvas a pedir esta información bajo ninguna circunstancia)\n"
+                    
         mensajes_api = [{"role": "system", "content": system_prompt}]
         mensajes_api.extend(history)
         mensajes_api.append({"role": "user", "content": mensaje})

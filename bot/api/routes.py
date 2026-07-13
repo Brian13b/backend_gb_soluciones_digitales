@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from bot.database import get_db
 from shared.schemas import ChatWebRequest, ChatResponse
+from shared.models import Contact
 from bot import crud
 from bot.bot_logic import BotLogic
 from bot.core.config import settings
@@ -20,7 +21,14 @@ async def chat_web(request_data: ChatWebRequest, db: Session = Depends(get_db)):
 
     history = crud.get_conversation_history(db, conversation.id)
 
-    bot_output = bot.procesar(request_data.mensaje, history=history, channel="web")
+    contacto_existente = db.query(Contact).filter(Contact.conversation_id == conversation.id).first()
+    datos_confirmados = {}
+    if contacto_existente:
+        if contacto_existente.name: datos_confirmados['nombre'] = contacto_existente.name
+        if contacto_existente.email: datos_confirmados['email'] = contacto_existente.email
+        if contacto_existente.phone: datos_confirmados['teléfono'] = contacto_existente.phone
+
+    bot_output = bot.procesar(request_data.mensaje, history=history, channel="web", datos_confirmados=datos_confirmados)
     respuesta_ia = bot_output.get("respuesta", "Hubo un error al procesar tu consulta.")
     extracted_contact = bot_output.get("extracted_contact", {})
 
@@ -100,7 +108,14 @@ async def handle_message(request: Request, db: Session = Depends(get_db)):
                 
                 crud.add_message(db, conversation.id, role="user", content=mensaje_usuario)
 
-                bot_output = bot.procesar(mensaje_usuario, history=history, channel="whatsapp")
+                contacto_existente = db.query(Contact).filter(Contact.conversation_id == conversation.id).first()
+                datos_confirmados = {}
+                if contacto_existente:
+                    if contacto_existente.name: datos_confirmados['nombre'] = contacto_existente.name
+                    if contacto_existente.email: datos_confirmados['email'] = contacto_existente.email
+                    if contacto_existente.phone: datos_confirmados['teléfono'] = contacto_existente.phone
+                
+                bot_output = bot.procesar(mensaje_usuario, history=history, channel="whatsapp", datos_confirmados=datos_confirmados, webhook_phone=numero_cliente)
                 respuesta_ia = bot_output.get("respuesta", "Hubo un error al procesar tu consulta.")
                 extracted_contact = bot_output.get("extracted_contact", {})
 
